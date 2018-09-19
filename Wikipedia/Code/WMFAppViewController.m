@@ -204,8 +204,13 @@ static const NSString *kvo_SavedArticlesFetcher_progress = @"kvo_SavedArticlesFe
                                              selector:@selector(exploreFeedPreferencesDidChange:)
                                                  name:WMFExploreFeedPreferencesDidChangeNotification
                                                object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cookiesChanged:) name:NSHTTPCookieManagerCookiesChangedNotification object:nil];
 
     self.readingListsAlertController = [[WMFReadingListsAlertController alloc] init];
+}
+
+- (void)cookiesChanged:(NSNotification *)note {
+    NSLog(@"Cookies changed: %@", NSHTTPCookieStorage.sharedHTTPCookieStorage.cookies);
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle {

@@ -308,10 +308,16 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
         _headerImageView.clipsToBounds = YES;
         _headerImageView.contentMode = UIViewContentModeScaleAspectFill;
         _headerImageView.accessibilityIgnoresInvertColors = YES;
-        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(imageViewDidTap:)];
-        [_headerImageView addGestureRecognizer:tap];
     }
     return _headerImageView;
+}
+
+- (void)showLeadImage {
+    WMFArticleImageGalleryViewController *fullscreenGallery = [[WMFArticleImageGalleryViewController alloc] initWithArticle:self.article theme:self.theme overlayViewTopBarHidden:NO];
+    //    fullscreenGallery.referenceViewDelegate = self;
+    if (fullscreenGallery != nil) {
+        [self presentViewController:fullscreenGallery animated:YES completion:nil];
+    }
 }
 
 - (WMFArticleFetcher *)articleFetcher {
@@ -1001,6 +1007,8 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
     self.pullToRefresh.enabled = [self canRefresh];
     [self.pullToRefresh addTarget:self action:@selector(fetchArticle) forControlEvents:UIControlEventValueChanged];
     [self.webViewController.webView.scrollView addSubview:_pullToRefresh];
+
+    [self.webViewController.headerButton addTarget:self action:@selector(showLeadImage) forControlEvents:UIControlEventTouchUpInside];
 }
 
 #pragma mark - Table of Contents
@@ -1744,16 +1752,6 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
     [self presentViewControllerEmbeddedInNavigationController:issuesVC];
 }
 
-#pragma mark - Header Tap Gesture
-
-- (void)imageViewDidTap:(UITapGestureRecognizer *)tap {
-    WMFArticleImageGalleryViewController *fullscreenGallery = [[WMFArticleImageGalleryViewController alloc] initWithArticle:self.article theme:self.theme overlayViewTopBarHidden:NO];
-    //    fullscreenGallery.referenceViewDelegate = self;
-    if (fullscreenGallery != nil) {
-        [self presentViewController:fullscreenGallery animated:YES completion:nil];
-    }
-}
-
 #pragma mark - WMFImageGalleryViewControllerReferenceViewDelegate
 
 - (nullable UIImageView *)referenceViewForImageController:(WMFArticleImageGalleryViewController *)controller {
@@ -1808,20 +1806,22 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
     if (needsIntro) {
         navVC.view.alpha = 0;
     }
-    
+
     @weakify(self);
     @weakify(navVC);
-    void (^showIntro)(void)  = ^{
+    void (^showIntro)(void) = ^{
         @strongify(self);
         DescriptionWelcomeInitialViewController *welcomeVC = [DescriptionWelcomeInitialViewController wmf_viewControllerFromDescriptionWelcomeStoryboard];
         [welcomeVC applyTheme:self.theme];
-        [navVC presentViewController:welcomeVC animated:YES completion:^{
-            @strongify(navVC);
-            [[NSUserDefaults standardUserDefaults] wmf_setDidShowTitleDescriptionEditingIntro:YES];
-            navVC.view.alpha = 1;
-        }];
+        [navVC presentViewController:welcomeVC
+                            animated:YES
+                          completion:^{
+                              @strongify(navVC);
+                              [[NSUserDefaults standardUserDefaults] wmf_setDidShowTitleDescriptionEditingIntro:YES];
+                              navVC.view.alpha = 1;
+                          }];
     };
-    
+
     [self presentViewController:navVC animated:!needsIntro completion:(needsIntro ? showIntro : nil)];
 }
 
@@ -1932,7 +1932,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
             self.webViewController.webView.allowsLinkPreview = NO;
         }
         [self unregisterForPreviewing];
-        self.leadImagePreviewingContext = [self registerForPreviewingWithDelegate:self sourceView:self.headerView];
+        self.leadImagePreviewingContext = [self registerForPreviewingWithDelegate:self sourceView:self.webViewController.headerButton];
     } else {
         [self unregisterForPreviewing];
     }

@@ -28,6 +28,8 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
 @interface WebViewController () <WKScriptMessageHandler, UIScrollViewDelegate, WMFFindInPageKeyboardBarDelegate, UIPageViewControllerDelegate, WMFReferencePageViewAppearanceDelegate, WMFThemeable>
 
 @property (nonatomic, strong) NSLayoutConstraint *headerHeightConstraint;
+@property (nonatomic, strong) NSLayoutConstraint *headerTopConstraint;
+
 @property (nonatomic, strong) IBOutlet UIView *containerView;
 @property (nonatomic, strong) NSNumber *fontSizeMultiplier;
 
@@ -42,6 +44,8 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
 @property (nonatomic, strong) NSArray<WMFReference *> *lastClickedReferencesGroup;
 
 @property (nonatomic, strong) WMFTheme *theme;
+
+@property (nonatomic, strong, readwrite) UIButton *headerButton;
 
 @property (nonatomic, getter=isAfterFirstUserScrollInteraction) BOOL afterFirstUserScrollInteraction;
 
@@ -60,6 +64,7 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     if (self) {
         self.session = [SessionSingleton sharedInstance];
         self.headerFadingEnabled = YES;
+        self.headerButton = [UIButton buttonWithType:UIButtonTypeCustom];
     }
     return self;
 }
@@ -74,6 +79,7 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     if (self) {
         self.session = aSession;
         self.headerFadingEnabled = YES;
+        self.headerButton = [UIButton buttonWithType:UIButtonTypeCustom];
     }
     return self;
 }
@@ -456,6 +462,7 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     [self updateWebContentMarginForSize:self.view.bounds.size force:NO];
 }
 
+
 - (void)willTransitionToTraitCollection:(UITraitCollection *)newCollection withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
     [super willTransitionToTraitCollection:newCollection withTransitionCoordinator:coordinator];
     [self wmf_dismissReferencePopoverAnimated:NO completion:nil];
@@ -647,10 +654,9 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     self.webView.translatesAutoresizingMaskIntoConstraints = NO;
     self.webView.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
 
-    [self addHeaderView];
-
     [self.containerView wmf_addSubviewWithConstraintsToEdges:self.webView];
-    [self.containerView sendSubviewToBack:self.webView];
+
+    [self addHeaderView];
 
     self.webView.scrollView.decelerationRate = UIScrollViewDecelerationRateNormal;
 
@@ -738,18 +744,29 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     if (!self.headerView) {
         return;
     }
+    
+    NSAssert(self.webView != nil && self.webView.superview == self.containerView, @"web view must be initialized before adding the header view");
+
     self.headerView.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.webView.scrollView addSubview:self.headerView];
+    [self.containerView insertSubview:self.headerView atIndex:0];
 
-    NSLayoutConstraint *leadingConstraint = [self.webView.leadingAnchor constraintEqualToAnchor:self.headerView.leadingAnchor];
-    NSLayoutConstraint *trailingConstraint = [self.webView.trailingAnchor constraintEqualToAnchor:self.headerView.trailingAnchor];
-    [self.webView addConstraints:@[leadingConstraint, trailingConstraint]];
+    NSLayoutConstraint *leadingConstraint = [self.containerView.leadingAnchor constraintEqualToAnchor:self.headerView.leadingAnchor];
+    NSLayoutConstraint *trailingConstraint = [self.containerView.trailingAnchor constraintEqualToAnchor:self.headerView.trailingAnchor];
+    self.headerTopConstraint = [self.headerView.topAnchor constraintEqualToAnchor:self.containerView.topAnchor];
 
-    NSLayoutConstraint *topConstraint = [self.webView.scrollView.topAnchor constraintEqualToAnchor:self.headerView.topAnchor];
-    [self.webView.scrollView addConstraint:topConstraint];
+    [self.containerView addConstraints:@[leadingConstraint, trailingConstraint, self.headerTopConstraint]];
 
     self.headerHeightConstraint = [self.headerView.heightAnchor constraintEqualToConstant:0];
     [self.headerView addConstraint:self.headerHeightConstraint];
+    
+    self.headerButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.containerView insertSubview:self.headerButton aboveSubview:self.webView];
+    
+    NSLayoutConstraint *buttonTopConstraint = [self.headerView.topAnchor constraintEqualToAnchor:self.headerButton.topAnchor];
+    NSLayoutConstraint *buttonBottomConstraint = [self.headerView.bottomAnchor constraintEqualToAnchor:self.headerButton.bottomAnchor];
+    NSLayoutConstraint *buttonLeadingConstraint = [self.headerView.leadingAnchor constraintEqualToAnchor:self.headerButton.leadingAnchor];
+    NSLayoutConstraint *buttonTrailingConstraint = [self.headerView.trailingAnchor constraintEqualToAnchor:self.headerButton.trailingAnchor];
+    [self.containerView addConstraints:@[buttonTopConstraint, buttonBottomConstraint, buttonLeadingConstraint, buttonTrailingConstraint]];
 }
 
 - (void)showLicenseButtonPressed {
@@ -1067,6 +1084,9 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     if ([self.delegate respondsToSelector:@selector(webViewController:scrollViewDidScroll:)]) {
         [self.delegate webViewController:self scrollViewDidScroll:scrollView];
     }
+    self.headerView.transform = CGAffineTransformMakeTranslation(0, 0 - scrollView.contentOffset.y - scrollView.contentInset.top);
+    self.headerButton.transform = self.headerView.transform;
+    
     [self minimizeFindInPage];
     if (@available(iOS 12.0, *)) {
         // Somewhere along the line the webView.scrollView.contentOffset is set to 0,0 on iOS 12 and there's nothing useful in the stack trace
@@ -1115,6 +1135,10 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     if ([self.delegate respondsToSelector:@selector(webViewController:scrollViewDidEndScrollingAnimation:)]) {
         [self.delegate webViewController:self scrollViewDidEndScrollingAnimation:scrollView];
     }
+}
+
+- (void)scrollViewDidChangeAdjustedContentInset:(UIScrollView *)scrollView {
+    self.headerTopConstraint.constant = scrollView.contentInset.top;
 }
 
 #pragma mark -

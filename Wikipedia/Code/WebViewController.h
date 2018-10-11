@@ -65,6 +65,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, nullable) UIView *headerView;
 
+// headerButton is used to intercept touch events that the headerView can't receieve because it's behind the webView
+@property (nonatomic, strong, readonly) UIButton *headerButton; 
+
 @end
 
 @protocol WMFWebViewControllerDelegate <NSObject>

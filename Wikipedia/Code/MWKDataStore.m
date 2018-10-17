@@ -11,10 +11,6 @@ NSString *const WMFArticleUpdatedNotification = @"WMFArticleUpdatedNotification"
 NSString *const WMFArticleDeletedNotification = @"WMFArticleDeletedNotification";
 NSString *const WMFArticleDeletedNotificationUserInfoArticleKeyKey = @"WMFArticleDeletedNotificationUserInfoArticleKeyKey";
 
-NSString *const WMFContentGroupUpdatedNotification = @"WMFContentGroupUpdatedNotification";
-NSString *const WMFContentGroupUpdatedNotificationUserInfoContentGroupKeyKey = @"WMFContentGroupUpdatedNotificationUserInfoContentGroupKeyKey";
-NSString *const WMFContentGroupUpdatedNotificationUserInfoChangeTypeKey = @"WMFContentGroupUpdatedNotificationUserInfoChangeTypeKey";
-
 NSString *const WMFLibraryVersionKey = @"WMFLibraryVersion";
 
 NSString *const MWKDataStoreValidImageSitePrefix = @"//upload.wikimedia.org/";
@@ -33,8 +29,9 @@ static NSString *const MWKImageInfoFilename = @"ImageInfo.plist";
 @property (readwrite, strong, nonatomic) ArticleLocationController *articleLocationController;
 
 @property (nonatomic, strong) WMFReadingListsController *readingListsController;
-
 @property (nonatomic, strong) WMFExploreFeedContentController *feedContentController;
+@property (nonatomic, strong) WikidataDescriptionEditingController *wikidataDescriptionEditingController;
+@property (nonatomic, strong) RemoteNotificationsController *remoteNotificationsController;
 
 @property (readwrite, copy, nonatomic) NSString *basePath;
 @property (readwrite, strong, nonatomic) NSCache *articleCache;
@@ -82,6 +79,12 @@ static NSString *const MWKImageInfoFilename = @"ImageInfo.plist";
 }
 
 - (void)asynchronouslyCacheArticle:(MWKArticle *)article toDisk:(BOOL)toDisk completion:(nullable void (^)(NSError *error))completion {
+    if (!article) {
+        if (completion) {
+            completion(nil);
+        }
+        return;
+    }
     [self addArticleToMemoryCache:article];
     if (!toDisk) {
         if (completion) {
@@ -172,6 +175,8 @@ static uint64_t bundleHash() {
         self.feedContentController.siteURLs = [[MWKLanguageLinkController sharedInstance] preferredSiteURLs];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didReceiveMemoryWarningWithNotification:) name:UIApplicationDidReceiveMemoryWarningNotification object:nil];
         self.articleLocationController = [ArticleLocationController new];
+        self.wikidataDescriptionEditingController = [[WikidataDescriptionEditingController alloc] initWith:[WMFSession shared]];
+        self.remoteNotificationsController = [[RemoteNotificationsController alloc] initWith:[WMFSession shared]];
     }
     return self;
 }
@@ -223,8 +228,8 @@ static uint64_t bundleHash() {
 
     NSURL *coreDataDBURL = [containerURL URLByAppendingPathComponent:coreDataDBName isDirectory:NO];
     NSPersistentStoreCoordinator *persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:model];
-    NSDictionary *options = @{ NSMigratePersistentStoresAutomaticallyOption: @YES,
-                               NSInferMappingModelAutomaticallyOption: @YES };
+    NSDictionary *options = @{NSMigratePersistentStoresAutomaticallyOption: @YES,
+                              NSInferMappingModelAutomaticallyOption: @YES};
     NSError *persistentStoreError = nil;
     if (nil == [persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:coreDataDBURL options:options error:&persistentStoreError]) {
         // TODO: Metrics
@@ -331,15 +336,6 @@ static uint64_t bundleHash() {
                 } else {
                     [nc postNotificationName:WMFArticleUpdatedNotification object:article];
                 }
-            } else if ([object isKindOfClass:[WMFContentGroup class]]) {
-                WMFContentGroup *group = (WMFContentGroup *)object;
-                NSString *groupKey = group.key;
-                NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithCapacity:2];
-                if (groupKey) {
-                    userInfo[WMFContentGroupUpdatedNotificationUserInfoContentGroupKeyKey] = groupKey;
-                }
-                userInfo[WMFContentGroupUpdatedNotificationUserInfoChangeTypeKey] = key;
-                [nc postNotificationName:WMFContentGroupUpdatedNotification object:[note object] userInfo:userInfo];
             }
         }
     }
@@ -532,26 +528,26 @@ static uint64_t bundleHash() {
         defaultReadingList.canonicalName = [ReadingList defaultListCanonicalName];
         defaultReadingList.isDefault = YES;
     }
-    
+
     for (ReadingListEntry *entry in defaultReadingList.entries) {
         entry.isUpdatedLocally = YES;
     }
-    
+
     if ([moc hasChanges] && ![moc save:migrationError]) {
         return NO;
     }
-    
+
     NSFetchRequest<WMFArticle *> *request = [WMFArticle fetchRequest];
     request.fetchLimit = 500;
     request.predicate = [NSPredicate predicateWithFormat:@"savedDate != NULL && readingLists.@count == 0", defaultReadingList];
-    
+
     NSArray<WMFArticle *> *results = [moc executeFetchRequest:request error:migrationError];
     if (!results) {
         return NO;
     }
-    
+
     NSError *addError = nil;
-    
+
     while (results.count > 0) {
         for (WMFArticle *article in results) {
             [self.readingListsController addArticleToDefaultReadingList:article error:&addError];
@@ -610,7 +606,7 @@ static uint64_t bundleHash() {
             return;
         }
     }
-    
+
     if (currentLibraryVersion < 6) {
         if (![self migrateMainPageContentGroupInManagedObjectContext:moc error:&migrationError]) {
             DDLogError(@"Error during migration: %@", migrationError);
@@ -1123,7 +1119,7 @@ static uint64_t bundleHash() {
     }
 
     if (article.url.wmf_isNonStandardURL) {
-        return YES;  // OK to fail without error
+        return YES; // OK to fail without error
     }
     [self addArticleToMemoryCache:article];
     NSString *path = [self pathForArticle:article];
@@ -1580,9 +1576,10 @@ static uint64_t bundleHash() {
 - (void)clearCachesForUnsavedArticles {
     [[WMFImageController sharedInstance] deleteTemporaryCache];
     [[WMFImageController sharedInstance] removeLegacyCache];
-    [self removeUnreferencedArticlesFromDiskCacheWithFailure:^(NSError *_Nonnull error) {
-        DDLogError(@"Error removing unreferenced articles: %@", error);
-    }
+    [self
+        removeUnreferencedArticlesFromDiskCacheWithFailure:^(NSError *_Nonnull error) {
+            DDLogError(@"Error removing unreferenced articles: %@", error);
+        }
         success:^{
             DDLogDebug(@"Successfully removed unreferenced articles");
         }];
@@ -1596,34 +1593,76 @@ static uint64_t bundleHash() {
             completion(error);
         }
     };
+
+    __block NSError *updateError = nil;
+    NSError *invalidRequestParametersError = [NSError wmf_errorWithType:WMFErrorTypeInvalidRequestParameters userInfo:nil];
+    WMFTaskGroup *taskGroup = [[WMFTaskGroup alloc] init];
+
+    // Site info
+    NSURL *siteInfoURL = [NSURL URLWithString:@"https://meta.wikimedia.org/w/api.php?action=query&format=json&meta=siteinfo"];
+    NSURLRequest *siteInfoRequest = [NSURLRequest requestWithURL:siteInfoURL];
+
+    [taskGroup enter];
+    if (!siteInfoURL || !siteInfoRequest) {
+        updateError = invalidRequestParametersError;
+        [taskGroup leave];
+        return;
+    }
+
+    [[[WMFSession shared] jsonDictionaryTaskWith:siteInfoRequest
+                               completionHandler:^(NSDictionary<NSString *, id> *_Nullable siteInfo, NSURLResponse *_Nullable response, NSError *_Nullable error) {
+                                   dispatch_async(dispatch_get_main_queue(), ^{
+                                       if (error) {
+                                           updateError = error;
+                                           [taskGroup leave];
+                                           return;
+                                       }
+                                       NSDictionary *generalProps = [siteInfo valueForKeyPath:@"query.general"];
+                                       NSDictionary *readingListsConfig = generalProps[@"readinglists-config"];
+                                       [self updateReadingListsLimits:readingListsConfig];
+                                       [taskGroup leave];
+                                   });
+                               }] resume];
+    // Remote config
     NSURL *remoteConfigURL = [NSURL URLWithString:@"https://meta.wikimedia.org/static/current/extensions/MobileApp/config/ios.json"];
-    if (!remoteConfigURL) {
-        combinedCompletion([NSError wmf_errorWithType:WMFErrorTypeInvalidRequestParameters userInfo:nil]);
-        return;
-    }
     NSURLRequest *request = [NSURLRequest requestWithURL:remoteConfigURL];
-    if (!request) {
-        combinedCompletion([NSError wmf_errorWithType:WMFErrorTypeInvalidRequestParameters userInfo:nil]);
+
+    [taskGroup enter];
+    if (!remoteConfigURL || !request) {
+        updateError = invalidRequestParametersError;
+        [taskGroup leave];
         return;
     }
+
     [[[WMFSession shared] jsonDictionaryTaskWith:request
                                completionHandler:^(NSDictionary<NSString *, id> *_Nullable remoteConfigurationDictionary, NSURLResponse *_Nullable response, NSError *_Nullable error) {
                                    dispatch_async(dispatch_get_main_queue(), ^{
                                        if (error) {
-                                           DDLogError(@"Error checking remote config: %@", error);
-                                           combinedCompletion(error);
+                                           updateError = error;
+                                           [taskGroup leave];
                                            return;
                                        }
                                        [self updateLocalConfigurationFromRemoteConfiguration:remoteConfigurationDictionary];
-                                       combinedCompletion(error);
+                                       [taskGroup leave];
                                    });
                                }] resume];
+
+    [taskGroup waitInBackgroundWithCompletion:^{
+        combinedCompletion(updateError);
+    }];
 }
 
 - (void)updateLocalConfigurationFromRemoteConfiguration:(NSDictionary *)remoteConfigurationDictionary {
     NSNumber *disableReadingListSyncNumber = remoteConfigurationDictionary[@"disableReadingListSync"];
     BOOL shouldDisableReadingListSync = [disableReadingListSyncNumber boolValue];
     self.readingListsController.isSyncRemotelyEnabled = !shouldDisableReadingListSync;
+}
+
+- (void)updateReadingListsLimits:(NSDictionary *)readingListsConfig {
+    NSNumber *maxEntriesPerList = readingListsConfig[@"maxEntriesPerList"];
+    NSNumber *maxListsPerUser = readingListsConfig[@"maxListsPerUser"];
+    self.readingListsController.maxEntriesPerList = maxEntriesPerList;
+    self.readingListsController.maxListsPerUser = [maxListsPerUser intValue];
 }
 
 #pragma mark - Core Data
@@ -1659,6 +1698,10 @@ static uint64_t bundleHash() {
         [self.articlePreviewCache setObject:article forKey:key];
     }
     return article;
+}
+
+- (nullable WMFArticle *)fetchArticleWithWikidataID:(NSString *)wikidataID {
+    return [_viewContext fetchArticleWithWikidataID:wikidataID];
 }
 
 - (nullable WMFArticle *)fetchOrCreateArticleWithURL:(NSURL *)URL inManagedObjectContext:(NSManagedObjectContext *)moc {

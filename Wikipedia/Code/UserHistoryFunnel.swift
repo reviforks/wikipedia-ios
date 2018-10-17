@@ -23,7 +23,7 @@ private typealias ContentGroupKindAndLoggingCode = (kind: WMFContentGroupKind, l
     }
     
     private func event() -> Dictionary<String, Any> {
-        let userDefaults = UserDefaults.wmf_userDefaults()
+        let userDefaults = UserDefaults.wmf
         
         let fontSize = userDefaults.wmf_articleFontSizeMultiplier().intValue
         let theme = userDefaults.wmf_appTheme.displayName.lowercased()
@@ -81,16 +81,16 @@ private typealias ContentGroupKindAndLoggingCode = (kind: WMFContentGroupKind, l
         guard let eventData = eventData as? [String: Any] else {
             return
         }
-        EventLoggingService.shared.lastLoggedSnapshot = eventData as NSCoding
-        UserDefaults.wmf_userDefaults().wmf_lastAppVersion = WikipediaAppUtils.appVersion()
+        EventLoggingService.shared?.lastLoggedSnapshot = eventData as NSCoding
+        UserDefaults.wmf.wmf_lastAppVersion = WikipediaAppUtils.appVersion()
     }
     
     private var latestSnapshot: Dictionary<String, Any>? {
-        return EventLoggingService.shared.lastLoggedSnapshot as? Dictionary<String, Any>
+        return EventLoggingService.shared?.lastLoggedSnapshot as? Dictionary<String, Any>
     }
     
     @objc public func logSnapshot() {
-        guard EventLoggingService.shared.isEnabled else {
+        guard EventLoggingService.shared?.isEnabled ?? false else {
             return
         }
         
@@ -98,7 +98,7 @@ private typealias ContentGroupKindAndLoggingCode = (kind: WMFContentGroupKind, l
             return
         }
         
-        guard let lastAppVersion = UserDefaults.wmf_userDefaults().wmf_lastAppVersion else {
+        guard let lastAppVersion = UserDefaults.wmf.wmf_lastAppVersion else {
             log(event())
             return
         }

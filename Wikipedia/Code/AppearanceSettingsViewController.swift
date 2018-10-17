@@ -41,7 +41,7 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
     var sections = [AppearanceSettingsSection]()
 
     @objc static var disclosureText: String {
-        let currentAppTheme = UserDefaults.wmf_userDefaults().wmf_appTheme
+        let currentAppTheme = UserDefaults.wmf.wmf_appTheme
         return currentAppTheme.displayName
     }
     
@@ -94,11 +94,11 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
             let vc = customViewItem.viewController
 
             if let view = vc.view {
-                addChildViewController(vc)
+                addChild(vc)
                 view.frame = cell.contentView.bounds
                 view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
                 cell.contentView.addSubview(view)
-                vc.didMove(toParentViewController: self)
+                vc.didMove(toParent: self)
             }
             
             if let themeable = vc as? Themeable {
@@ -130,9 +130,9 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
         if item is AppearanceSettingsDimSwitchItem {
             cell.disclosureType = .switch
             cell.disclosureSwitch.isEnabled = false
-            cell.disclosureSwitch.isOn = UserDefaults.wmf_userDefaults().wmf_isImageDimmingEnabled
+            cell.disclosureSwitch.isOn = UserDefaults.wmf.wmf_isImageDimmingEnabled
             
-            let currentAppTheme = UserDefaults.wmf_userDefaults().wmf_appTheme
+            let currentAppTheme = UserDefaults.wmf.wmf_appTheme
             switch currentAppTheme {
             case Theme.blackDimmed:
                 fallthrough
@@ -155,7 +155,7 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
         else if item is AppearanceSettingsAutomaticTableOpenSwitchItem {
             cell.disclosureType = .switch
             cell.disclosureSwitch.isEnabled = true
-            cell.disclosureSwitch.isOn = UserDefaults.wmf_userDefaults().wmf_isAutomaticTableOpeningEnabled
+            cell.disclosureSwitch.isOn = UserDefaults.wmf.wmf_isAutomaticTableOpeningEnabled
             cell.disclosureSwitch.addTarget(self, action: #selector(self.handleAutomaticTableOpenSwitchValueChange(_:)), for: .valueChanged)
             cell.iconName = "settings-tables-expand"
             cell.iconBackgroundColor = UIColor.wmf_colorWithHex(0x5C97BF)
@@ -179,9 +179,9 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
             return
         }
         let vc = customViewItem.viewController
-        vc.willMove(toParentViewController: nil)
+        vc.willMove(toParent: nil)
         vc.view.removeFromSuperview()
-        vc.removeFromParentViewController()
+        vc.removeFromParent()
         if let cell = cell as? WMFSettingsTableViewCell {
             cell.disclosureSwitch.removeTarget(nil, action: nil, for: .valueChanged)
         }
@@ -221,7 +221,7 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
     }
     
     public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        let currentAppTheme = UserDefaults.wmf_userDefaults().wmf_appTheme
+        let currentAppTheme = UserDefaults.wmf.wmf_appTheme
         
         if let checkmarkItem = sections[indexPath.section].items[indexPath.item] as? AppearanceSettingsCheckmarkItem {
             if currentAppTheme.withDimmingEnabled(false) === checkmarkItem.theme {
@@ -235,8 +235,8 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
     }
     
     @objc func applyImageDimmingChange(isOn: NSNumber) {
-        let currentTheme = UserDefaults.wmf_userDefaults().wmf_appTheme
-        UserDefaults.wmf_userDefaults().wmf_isImageDimmingEnabled = isOn.boolValue
+        let currentTheme = UserDefaults.wmf.wmf_appTheme
+        UserDefaults.wmf.wmf_isImageDimmingEnabled = isOn.boolValue
         userDidSelect(theme: currentTheme.withDimmingEnabled(isOn.boolValue))
     }
     
@@ -247,7 +247,7 @@ final class AppearanceSettingsViewController: SubSettingsViewController {
     }
     
     @objc func applyAutomaticTableOpenChange(isOn: NSNumber) {
-        UserDefaults.wmf_userDefaults().wmf_isAutomaticTableOpeningEnabled = isOn.boolValue
+        UserDefaults.wmf.wmf_isAutomaticTableOpeningEnabled = isOn.boolValue
     }
     
     @objc func handleAutomaticTableOpenSwitchValueChange(_ sender: UISwitch) {

@@ -94,7 +94,8 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
                                         WMFSearchButtonProviding,
                                         WMFImageScaleTransitionProviding,
                                         UIGestureRecognizerDelegate,
-                                        EventLoggingSearchSourceProviding>
+                                        EventLoggingSearchSourceProviding,
+                                        DescriptionEditViewControllerDelegate>
 
 // Data
 @property (nonatomic, strong, readwrite, nullable) MWKArticle *article;
@@ -120,7 +121,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 // Fetchers
 @property (nonatomic, strong) WMFArticleFetcher *articleFetcher;
 @property (nonatomic, strong, nullable) NSURLSessionTask *articleFetcherPromise;
-@property (nonatomic, strong, nullable) AFNetworkReachabilityManager *reachabilityManager;
+@property (nonatomic, strong, nullable) WMFReachabilityNotifier *reachabilityNotifier;
 
 // Views
 @property (nonatomic, strong, nullable) UIImageView *headerImageTransitionView;
@@ -188,8 +189,18 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
         self.hidesBottomBarWhenPushed = YES;
         self.edgesForExtendedLayout = UIRectEdgeAll;
         self.extendedLayoutIncludesOpaqueBars = YES;
-        self.reachabilityManager = [AFNetworkReachabilityManager manager];
-        [self.reachabilityManager startMonitoring];
+        @weakify(self);
+        self.reachabilityNotifier = [[WMFReachabilityNotifier alloc] initWithHost:WMFDefaultSiteDomain callback:^(BOOL isReachable, SCNetworkReachabilityFlags flags) {
+            if (isReachable) {
+                @strongify(self);
+                [self.reachabilityNotifier stop];
+                @weakify(self);
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    @strongify(self);
+                    [self fetchArticleIfNeeded];
+                });
+            }
+        }];
         self.savingOpenArticleTitleEnabled = YES;
         self.addingArticleToHistoryListEnabled = YES;
         self.peekingAllowed = YES;
@@ -734,6 +745,9 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 #pragma mark - ViewController
 
 - (void)viewDidLoad {
+    if (@available(iOS 12, *)) {
+        self.subtractTopAndBottomSafeAreaInsetsFromScrollIndicatorInsets = YES;
+    }
     self.savedPagesFunnel = [[SavedPagesFunnel alloc] init];
     [self setUpTitleBarButton];
 
@@ -765,7 +779,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 
     [self updateTableOfContentsDisplayModeWithTraitCollection:self.traitCollection];
 
-    BOOL isVisibleInline = [[NSUserDefaults wmf_userDefaults] wmf_isTableOfContentsVisibleInline];
+    BOOL isVisibleInline = [[NSUserDefaults wmf] wmf_isTableOfContentsVisibleInline];
 
     self.tableOfContentsDisplayState = self.tableOfContentsDisplayMode == WMFTableOfContentsDisplayModeInline ? isVisibleInline ? WMFTableOfContentsDisplayStateInlineVisible : WMFTableOfContentsDisplayStateInlineHidden : WMFTableOfContentsDisplayStateModalHidden;
 
@@ -784,7 +798,6 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    [self.reachabilityManager startMonitoring];
     [self saveOpenArticleTitleWithCurrentlyOnscreenFragment];
 }
 
@@ -802,7 +815,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
-    [self.reachabilityManager stopMonitoring];
+    [self.reachabilityNotifier stop];
 }
 
 - (void)traitCollectionDidChange:(nullable UITraitCollection *)previousTraitCollection {
@@ -812,7 +825,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
     //        [self.presentedViewController dismissViewControllerAnimated:YES completion:nil];
     //    }
     [self registerForPreviewingIfAvailable];
-    NSNumber *multiplier = [[NSUserDefaults wmf_userDefaults] wmf_articleFontSizeMultiplier];
+    NSNumber *multiplier = [[NSUserDefaults wmf] wmf_articleFontSizeMultiplier];
     [self.webViewController setFontSizeMultiplier:multiplier];
 }
 
@@ -1058,7 +1071,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
     switch (self.tableOfContentsDisplayMode) {
         case WMFTableOfContentsDisplayModeInline:
             if (sender != self) {
-                [[NSUserDefaults wmf_userDefaults] wmf_setTableOfContentsIsVisibleInline:YES];
+                [[NSUserDefaults wmf] wmf_setTableOfContentsIsVisibleInline:YES];
             }
             self.tableOfContentsDisplayState = WMFTableOfContentsDisplayStateInlineVisible;
             [self updateTableOfContentsLayoutAnimated:YES];
@@ -1075,7 +1088,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
     switch (self.tableOfContentsDisplayMode) {
         case WMFTableOfContentsDisplayModeInline:
             if (sender != self) {
-                [[NSUserDefaults wmf_userDefaults] wmf_setTableOfContentsIsVisibleInline:NO];
+                [[NSUserDefaults wmf] wmf_setTableOfContentsIsVisibleInline:NO];
             }
             self.tableOfContentsDisplayState = WMFTableOfContentsDisplayStateInlineHidden;
             [self updateTableOfContentsLayoutAnimated:YES];
@@ -1273,18 +1286,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
                                                      tapCallBack:NULL];
 
                 if ([error wmf_isNetworkConnectionError]) {
-                    @weakify(self);
-                    [self.reachabilityManager setReachabilityStatusChangeBlock:^(AFNetworkReachabilityStatus status) {
-                        switch (status) {
-                            case AFNetworkReachabilityStatusReachableViaWWAN:
-                            case AFNetworkReachabilityStatusReachableViaWiFi: {
-                                @strongify(self);
-                                [self fetchArticleIfNeeded];
-                            } break;
-                            default:
-                                break;
-                        }
-                    }];
+                    [self.reachabilityNotifier start];
                 }
             }
 
@@ -1490,7 +1492,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 
     NSNumber *multiplier = self.fontSizeMultipliers[value];
     [self.webViewController setFontSizeMultiplier:multiplier];
-    [[NSUserDefaults wmf_userDefaults] wmf_setArticleFontSizeMultiplier:multiplier];
+    [[NSUserDefaults wmf] wmf_setArticleFontSizeMultiplier:multiplier];
 }
 
 - (void)themeChangedInArticleControls:(WMFReadingThemesControlsViewController *_Nonnull)controller theme:(WMFTheme *_Nonnull)theme {
@@ -1517,7 +1519,7 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 }
 
 - (NSUInteger)indexOfCurrentFontSize {
-    NSNumber *fontSize = [[NSUserDefaults wmf_userDefaults] wmf_articleFontSizeMultiplier];
+    NSNumber *fontSize = [[NSUserDefaults wmf] wmf_articleFontSizeMultiplier];
 
     NSUInteger index = [[self fontSizeMultipliers] indexOfObject:fontSize];
 
@@ -1575,12 +1577,12 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
             return;
         }
         NSURL *url = [self.article.url wmf_URLWithFragment:visibleSection.anchor];
-        [[NSUserDefaults wmf_userDefaults] wmf_setOpenArticleURL:url];
+        [[NSUserDefaults wmf] wmf_setOpenArticleURL:url];
     }];
 }
 
 - (void)webViewController:(WebViewController *)controller didTapEditForSection:(MWKSection *)section {
-    [self showEditorForSection:section];
+    [self showEditorForSectionOrTitleDescription:section];
 }
 
 - (void)webViewController:(WebViewController *)controller didTapOnLinkForArticleURL:(NSURL *)url {
@@ -1687,6 +1689,10 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
     }
 }
 
+- (void)webViewController:(WebViewController *)controller didTapAddTitleDescriptionForArticle:(MWKArticle *)article {
+    [self showTitleDescriptionEditor];
+}
+
 - (void)showLocation {
     NSURL *placesURL = [NSUserActivity wmf_URLForActivityOfType:WMFUserActivityTypePlaces withArticleURL:self.article.url];
     [[UIApplication sharedApplication] openURL:placesURL options:@{} completionHandler:NULL];
@@ -1760,17 +1766,81 @@ static const CGFloat WMFArticleViewControllerTableOfContentsSectionUpdateScrollD
 
 #pragma mark - Edit Section
 
-- (void)showEditorForSection:(MWKSection *)section {
+- (void)showEditorForSectionOrTitleDescription:(MWKSection *)section {
     if (self.article.editable) {
-        SectionEditorViewController *sectionEditVC = [SectionEditorViewController wmf_initialViewControllerFromClassStoryboard];
-        sectionEditVC.section = section;
-        sectionEditVC.delegate = self;
-        [self presentViewControllerEmbeddedInNavigationController:sectionEditVC];
+        if ([self.article isWikidataDescriptionEditable] && [section isLeadSection] && self.article.entityDescription) {
+            [self showEditSectionOrTitleDescriptionDialogForSection:section];
+        } else {
+            [self showEditorForSection:section];
+        }
     } else {
         ProtectedEditAttemptFunnel *funnel = [[ProtectedEditAttemptFunnel alloc] init];
         [funnel logProtectionStatus:[[self.article.protection allowedGroupsForAction:@"edit"] componentsJoinedByString:@","]];
         [self showProtectedDialog];
     }
+}
+
+- (void)showEditorForSection:(MWKSection *)section {
+    SectionEditorViewController *sectionEditVC = [SectionEditorViewController wmf_initialViewControllerFromClassStoryboard];
+    sectionEditVC.section = section;
+    sectionEditVC.delegate = self;
+    [self presentViewControllerEmbeddedInNavigationController:sectionEditVC];
+}
+
+- (void)descriptionEditViewControllerEditSucceeded:(DescriptionEditViewController *)descriptionEditViewController {
+    [self fetchArticle];
+}
+
+- (void)showTitleDescriptionEditor {
+    DescriptionEditViewController *editVC = [DescriptionEditViewController wmf_initialViewControllerFromClassStoryboard];
+    editVC.delegate = self;
+    editVC.article = self.article;
+    [editVC applyTheme:self.theme];
+
+    WMFThemeableNavigationController *navVC = [[WMFThemeableNavigationController alloc] initWithRootViewController:editVC theme:self.theme];
+    navVC.view.opaque = NO;
+    navVC.view.backgroundColor = [UIColor clearColor];
+    navVC.modalPresentationStyle = UIModalPresentationOverCurrentContext;
+
+    BOOL needsIntro = ![[NSUserDefaults standardUserDefaults] wmf_didShowTitleDescriptionEditingIntro];
+    if (needsIntro) {
+        navVC.view.alpha = 0;
+    }
+    
+    @weakify(self);
+    @weakify(navVC);
+    void (^showIntro)(void)  = ^{
+        @strongify(self);
+        DescriptionWelcomeInitialViewController *welcomeVC = [DescriptionWelcomeInitialViewController wmf_viewControllerFromDescriptionWelcomeStoryboard];
+        [welcomeVC applyTheme:self.theme];
+        [navVC presentViewController:welcomeVC animated:YES completion:^{
+            @strongify(navVC);
+            [[NSUserDefaults standardUserDefaults] wmf_setDidShowTitleDescriptionEditingIntro:YES];
+            navVC.view.alpha = 1;
+        }];
+    };
+    
+    [self presentViewController:navVC animated:!needsIntro completion:(needsIntro ? showIntro : nil)];
+}
+
+- (void)showEditSectionOrTitleDescriptionDialogForSection:(MWKSection *)section {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:nil message:nil preferredStyle:UIAlertControllerStyleAlert];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:WMFLocalizedStringWithDefaultValue(@"description-edit-pencil-title", nil, nil, @"Edit title description", @"Title for button used to show title description editor")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *_Nonnull action) {
+                                                [self showTitleDescriptionEditor];
+                                            }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:WMFLocalizedStringWithDefaultValue(@"description-edit-pencil-introduction", nil, nil, @"Edit introduction", @"Title for button used to show article lead section editor")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *_Nonnull action) {
+                                                [self showEditorForSection:section];
+                                            }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:[WMFCommonStrings cancelActionTitle] style:UIAlertActionStyleCancel handler:NULL]];
+
+    [self presentViewController:sheet animated:YES completion:NULL];
 }
 
 - (void)showProtectedDialog {

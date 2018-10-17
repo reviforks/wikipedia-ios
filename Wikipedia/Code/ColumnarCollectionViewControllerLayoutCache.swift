@@ -37,7 +37,7 @@ class ColumnarCollectionViewControllerLayoutCache {
         let cacheKey = cacheKeyForCellWithIdentifier(identifier, userInfo: userInfo)
         cachedHeights.removeValue(forKey: cacheKey)
     }
-
+    
     public func reset() {
         cachedHeights.removeAll(keepingCapacity: true)
         cacheKeysByArticleKey.removeAll(keepingCapacity: true)

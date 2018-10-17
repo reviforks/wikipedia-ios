@@ -24,7 +24,6 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
         NotificationCenter.default.addObserver(self, selector: #selector(exploreFeedPreferencesDidSave(_:)), name: NSNotification.Name.WMFExploreFeedPreferencesDidSave, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(articleDidChange(_:)), name: NSNotification.Name.WMFArticleUpdated, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(articleDeleted(_:)), name: NSNotification.Name.WMFArticleDeleted, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(contentGroupDidChange(_:)), name: NSNotification.Name.WMFContentGroupUpdated, object: nil)
     }
 
     deinit {
@@ -283,13 +282,23 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
         refreshControl.endRefreshing()
     }
     
-    lazy var reachabilityManager: AFNetworkReachabilityManager = {
-        return AFNetworkReachabilityManager(forDomain: WMFDefaultSiteDomain)
+    lazy var reachabilityNotifier: ReachabilityNotifier = {
+        let notifier = ReachabilityNotifier(WMFDefaultSiteDomain) { [weak self] (reachable, flags) in
+            if reachable {
+                DispatchQueue.main.async {
+                    self?.updateFeedSources(userInitiated: false)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self?.showOfflineEmptyViewIfNeeded()
+                }
+            }
+        }
+        return notifier
     }()
     
     private func stopMonitoringReachability() {
-        reachabilityManager.setReachabilityStatusChange(nil)
-        reachabilityManager.stopMonitoring()
+        reachabilityNotifier.stop()
     }
     
     private func startMonitoringReachabilityIfNeeded() {
@@ -297,24 +306,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
             stopMonitoringReachability()
             return
         }
-        
-        reachabilityManager.startMonitoring()
-        reachabilityManager.setReachabilityStatusChange { [weak self] (status) in
-            switch status {
-            case .reachableViaWiFi:
-                fallthrough
-            case .reachableViaWWAN:
-                DispatchQueue.main.async {
-                    self?.updateFeedSources(userInitiated: false)
-                }
-            case .notReachable:
-                DispatchQueue.main.async {
-                    self?.showOfflineEmptyViewIfNeeded()
-                }
-            default:
-                break
-            }
-        }
+        reachabilityNotifier.start()
     }
     
     private func showOfflineEmptyViewIfNeeded() {
@@ -331,7 +323,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
             return
         }
         
-        guard reachabilityManager.networkReachabilityStatus == .notReachable else {
+        guard !reachabilityNotifier.isReachable else {
             return
         }
         
@@ -405,7 +397,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
     }
     
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
-        guard kind == UICollectionElementKindSectionHeader else {
+        guard kind == UICollectionView.elementKindSectionHeader else {
             abort()
         }
         guard let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: CollectionViewHeader.identifier, for: indexPath) as? CollectionViewHeader else {
@@ -473,9 +465,9 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
         cardVC.delegate = self
         cardVC.dataStore = dataStore
         cardVC.view.autoresizingMask = []
-        addChildViewController(cardVC)
+        addChild(cardVC)
         cell.cardContent = cardVC
-        cardVC.didMove(toParentViewController: self)
+        cardVC.didMove(toParent: self)
         return cardVC
     }
 
@@ -512,7 +504,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
             }
             themeable.apply(theme: theme)
         }
-        for header in collectionView.visibleSupplementaryViews(ofKind: UICollectionElementKindSectionHeader) {
+        for header in collectionView.visibleSupplementaryViews(ofKind: UICollectionView.elementKindSectionHeader) {
             guard let themeable = header as? Themeable else {
                 continue
             }
@@ -536,7 +528,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
             return estimate
         }
         configure(cell: placeholderCell, forItemAt: indexPath, layoutOnly: true)
-        estimate.height = placeholderCell.sizeThatFits(CGSize(width: columnWidth, height: UIViewNoIntrinsicMetric), apply: false).height
+        estimate.height = placeholderCell.sizeThatFits(CGSize(width: columnWidth, height: UIView.noIntrinsicMetric), apply: false).height
         estimate.precalculated = true
         layoutCache.setHeight(estimate.height, forCellWithIdentifier: identifier, columnWidth: columnWidth, groupKey: group.key, userInfo: userInfo)
         return estimate
@@ -547,11 +539,11 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
             return ColumnarCollectionViewLayoutHeightEstimate(precalculated: true, height: 0)
         }
         var estimate = ColumnarCollectionViewLayoutHeightEstimate(precalculated: false, height: 100)
-        guard let header = layoutManager.placeholder(forSupplementaryViewOfKind: UICollectionElementKindSectionHeader, withReuseIdentifier: CollectionViewHeader.identifier) as? CollectionViewHeader else {
+        guard let header = layoutManager.placeholder(forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: CollectionViewHeader.identifier) as? CollectionViewHeader else {
             return estimate
         }
         configureHeader(header, for: section)
-        estimate.height = header.sizeThatFits(CGSize(width: columnWidth, height: UIViewNoIntrinsicMetric), apply: false).height
+        estimate.height = header.sizeThatFits(CGSize(width: columnWidth, height: UIView.noIntrinsicMetric), apply: false).height
         estimate.precalculated = true
         return estimate
     }
@@ -607,7 +599,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
     }
     
     #if DEBUG
-    override func motionEnded(_ motion: UIEventSubtype, with event: UIEvent?) {
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
         guard motion == .motionShake else {
             return
         }
@@ -850,7 +842,7 @@ extension ExploreViewController: ExploreCardCollectionViewCellDelegate {
         }
         layoutCache.invalidateArticleKey(articleKey)
     }
-    
+
     @objc func contentGroupDidChange(_ note: Notification) {
         guard
             let groupKey = note.userInfo?[WMFContentGroupUpdatedNotificationUserInfoContentGroupKeyKey] as? String,
@@ -861,6 +853,7 @@ extension ExploreViewController: ExploreCardCollectionViewCellDelegate {
         }
         layoutCache.invalidateGroupKey(groupKey)
     }
+
 
     private func menuActionSheetForGroup(_ group: WMFContentGroup) -> UIAlertController? {
         guard group.contentGroupKind.isCustomizable || group.contentGroupKind.isGlobal else {

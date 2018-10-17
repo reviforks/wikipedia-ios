@@ -10,6 +10,8 @@
 // Author: Happy13241
 // Author: Helpau
 // Author: Iluvatar
+// Author: Infovarius
+// Author: Iniquity
 // Author: Irus
 // Author: JackLantern
 // Author: Jackie
@@ -138,10 +140,47 @@
 "button-skip" = "Пропустить";
 "cancel" = "Отмена";
 "cc-by-sa-3.0" = "CC BY-SA 3.0";
+"cc-zero" = "Creative Commons CC0";
 "close-button-accessibility-label" = "Закрыть";
 "compass-direction" = "на $1 часов";
 "continue-reading-empty-description" = "Исследуйте Википедию, чтоб найти больше статьей для чтения";
 "continue-reading-empty-title" = "Нет недавно прочитанных статей";
+"description-add-link-title" = "Добавить описание названия";
+"description-add-title" = "Добавить описание";
+"description-edit-for-article" = "Описание названия «$1»";
+"description-edit-learn-more" = "Узнать больше";
+"description-edit-length-warning" = "$1 / $2";
+"description-edit-license" = "Изменяя описание названия, я соглашаюсь на $1 и безотзывно опубликовать свой вклад под лицензией $2";
+"description-edit-pencil-introduction" = "Редактировать введение";
+"description-edit-pencil-title" = "Редактировать описание названия";
+"description-edit-placeholder-title" = "Краткие описания лучше всего";
+"description-edit-publish" = "Записать описание";
+"description-edit-title" = "Править описание";
+"description-edit-warning" = "Старайтесь ограничивать размер описаний, чтобы пользователи могли понимать предмет статьи с одного взгляда";
+"description-help-about-description" = "Краткие описания помогают читателям понять тему статьи с первого взгляда.";
+"description-help-about-title" = "О приложении";
+"description-help-about-wikidata" = "О Викиданных";
+"description-help-more-info-description" = "Описания хранятся в Викиданных (Wikidata) — проекте Фонда Викимедиа, представляющем собой свободную совместно наполняемую  многоязычную основанную на внешних источниках вторичную базу данных для поддержки Википедии и других проектов.";
+"description-help-more-info-title" = "Подробнее";
+"description-help-tips-description" = "Описания по возможности должны вписываться в одну строку и составлять от двух до двенадцати слов. Их следует начинать со строчной (маленькой) буквы, кроме случаев, когда первое слово — имя собственное.";
+"description-help-tips-example-description-one" = "краткое описание статьи о Мона Лизе";
+"description-help-tips-example-description-two" = "краткое описание статьи о горе Эверест";
+"description-help-tips-example-title-one" = "картина Леонардо да Винчи";
+"description-help-tips-example-title-two" = "Самая высокая гора Земли";
+"description-help-tips-for-example" = "Например:";
+"description-help-tips-title" = "Советы по созданию описаний";
+"description-help-title" = "Помощь по описанию названия";
+"description-help-wikidata-guide" = "Руководство Викиданных по созданию описаний.";
+"description-published-button-title" = "Готово";
+"description-published-footer" = "С этим приложением вы также можете редактировать статьи. Затем нажмите на иконку, чтобы исправить опечатки и малые предложения";
+"description-published-subtitle" = "Вы только что сделали Википедию лучше для каждого";
+"description-published-title" = "Описание сохранено!";
+"description-welcome-concise-sub-title" = "По возможности одна строка, от двух до двадцати слов";
+"description-welcome-concise-title" = "Пожалуйста, кратко";
+"description-welcome-descriptions-sub-title" = "Краткие описания помогают читателям понять тему статьи с первого взгляда";
+"description-welcome-descriptions-title" = "Описания названий";
+"description-welcome-promise-title" = "Начиная использование, я обещаю не злоупотреблять этой возможностью";
+"description-welcome-start-editing-button" = "Начать редактирование";
 "dim-images" = "Делать изображения менее яркими";
 "edit-summary-choice-fixed-grammar" = "Исправлено правописание";
 "edit-summary-choice-fixed-typos" = "Исправлена опечатка";
@@ -162,6 +201,8 @@
 "empty-no-saved-pages-message" = "Сохраняйте страницы, чтобы просматривать их позже, даже в автономном режиме";
 "empty-no-saved-pages-title" = "Ещё нет сохранённых страниц";
 "empty-no-search-results-message" = "Ничего не найдено";
+"error-generic-description" = "Произошла непредвиденная ошибка";
+"error-generic-recovery-suggestion" = "Пожалуйста, повторите позже";
 "error-unknown" = "Произошла неизвестная ошибка";
 "explore-another-random" = "Другая случайная статья";
 "explore-because-you-read" = "На основе прочитанного";
@@ -170,7 +211,7 @@
 "explore-detail-back-button-title" = "Назад к вкладке Обзор";
 "explore-enable-location-title" = "Прочитайте статьи википедии об объектах вблизи текущего местоположения";
 "explore-featured-article-heading" = "Избранная статья";
-"explore-featured-article-sub-heading-from-language-wikipedia" = "Раздел википедии: $1";
+"explore-featured-article-sub-heading-from-language-wikipedia" = "Раздел Википедии: $1";
 "explore-featured-article-sub-heading-from-wikipedia" = "Из Википедии";
 "explore-feed-customize-accessibility-title" = "Настроить";
 "explore-feed-language-settings" = "Языковые настройки Ленты";
@@ -232,20 +273,20 @@
 "explore-main-page-description" = "Заглавная страница проектов Викимедиа";
 "explore-main-page-heading" = "Сегодня в Википедии";
 "explore-most-read-footer" = "Все самые читаемые статьи";
-"explore-most-read-generic-heading" = "Наиболее читаемые";
+"explore-most-read-generic-heading" = "Самые читаемые";
 "explore-most-read-more-list-title-for-date" = "Самое читаемое на $1";
-"explore-most-read-sub-heading-on-language-wikipedia" = "На $1 Википедии";
-"explore-most-read-sub-heading-on-wikipedia" = "На Википедии";
+"explore-most-read-sub-heading-on-language-wikipedia" = "В Википедии ($1 раздел)";
+"explore-most-read-sub-heading-on-wikipedia" = "В Википедии";
 "explore-nearby-heading" = "Места поблизости";
 "explore-nearby-placeholder-heading" = "Места";
-"explore-nearby-placeholder-sub-heading-on-language-wikipedia" = "Раздел википедии: $1";
-"explore-nearby-placeholder-sub-heading-on-wikipedia" = "Из википедии";
+"explore-nearby-placeholder-sub-heading-on-language-wikipedia" = "Раздел Википедии: $1";
+"explore-nearby-placeholder-sub-heading-on-wikipedia" = "Из Википедии";
 "explore-nearby-sub-heading-your-location" = "Ваше местоположение";
-"explore-nearby-sub-heading-your-location-from-language-wikipedia" = "Местоположение, согласно разделу википедии: $1";
+"explore-nearby-sub-heading-your-location-from-language-wikipedia" = "Местоположение, согласно разделу Википедии: $1";
 "explore-potd-heading" = "Изображение дня";
 "explore-potd-sub-heading" = "Из Викисклада";
 "explore-random-article-heading" = "Случайная статья";
-"explore-random-article-sub-heading-from-language-wikipedia" = "Раздел википедии: $1";
+"explore-random-article-sub-heading-from-language-wikipedia" = "Раздел Википедии: $1";
 "explore-random-article-sub-heading-from-wikipedia" = "Из Википедии";
 "explore-randomizer" = "Рандомизатор";
 "feed-news-notification-button-text" = "Включить уведомления";
@@ -313,7 +354,7 @@
 "in-the-news-notification-read-now-action-title" = "Прочитать сейчас";
 "in-the-news-notification-save-for-later-action-title" = "Сохранить на потом";
 "in-the-news-notification-share-action-title" = "Поделиться...";
-"in-the-news-sub-title-from-language-wikipedia" = "Раздел википедии: $1";
+"in-the-news-sub-title-from-language-wikipedia" = "Раздел Википедии: $1";
 "in-the-news-sub-title-from-wikipedia" = "Из Википедии";
 "in-the-news-title" = "В новостях";
 "info-box-close-text" = "Закрыть";
@@ -536,6 +577,7 @@
 "settings-clear-cache-ok" = "Очистить кэш";
 "settings-help-and-feedback" = "Помощь и обратная связь";
 "settings-language-bar" = "Показывать языки при поиске";
+"settings-languages-feed-customization" = "В настройках вы можете указать, какие языки будут показаны в вашей Ленте.";
 "settings-my-languages" = "Мои языки";
 "settings-notifications" = "Уведомления";
 "settings-notifications-info" = "Будьте в курсе трендов и самых читаемых статей Википедии используя push-уведомления. Вся информация предоставляется актуальной и с сохранением конфиденциальности.";
@@ -589,7 +631,7 @@
 "theme-default-display-name" = "По умолчанию";
 "theme-sepia-display-name" = "Сепия";
 "top-read-header-generic" = "Википедия";
-"top-read-header-with-language" = "$1 Википедия";
+"top-read-header-with-language" = "Википедия ($1 раздел)";
 "top-read-see-more" = "Посмотреть больше самых читаемых статей";
 "two-factor-login-continue" = "Продолжить процедуру входа";
 "two-factor-login-instructions" = "Пожалуйста, введите проверочный код двухэтапной авторизации";

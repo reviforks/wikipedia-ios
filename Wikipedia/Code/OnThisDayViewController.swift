@@ -54,16 +54,17 @@ class OnThisDayViewController: ColumnarCollectionViewController, ReadingListHint
     override func viewDidLoad() {
         super.viewDidLoad()
         layoutManager.register(OnThisDayCollectionViewCell.self, forCellWithReuseIdentifier: OnThisDayViewController.cellReuseIdentifier, addPlaceholder: true)
-        layoutManager.register(UINib(nibName: OnThisDayViewController.headerReuseIdentifier, bundle: nil), forSupplementaryViewOfKind: UICollectionElementKindSectionHeader, withReuseIdentifier: OnThisDayViewController.headerReuseIdentifier, addPlaceholder: false)
-        layoutManager.register(OnThisDayViewControllerBlankHeader.self, forSupplementaryViewOfKind: UICollectionElementKindSectionHeader, withReuseIdentifier: OnThisDayViewController.blankHeaderReuseIdentifier, addPlaceholder: false)
+        layoutManager.register(UINib(nibName: OnThisDayViewController.headerReuseIdentifier, bundle: nil), forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: OnThisDayViewController.headerReuseIdentifier, addPlaceholder: false)
+        layoutManager.register(OnThisDayViewControllerBlankHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: OnThisDayViewController.blankHeaderReuseIdentifier, addPlaceholder: false)
         readingListHintController = ReadingListHintController(dataStore: dataStore, presenter: self)
     }
     
     func scrollToInitialEvent() {
-        guard let event = initialEvent, let index = events.index(of: event), events.indices.contains(index) else {
+        guard let event = initialEvent, let eventIndex = events.index(of: event), events.indices.contains(eventIndex) else {
             return
         }
-        collectionView.scrollToItem(at: IndexPath(item: 0, section: index), at: index < 1 ? .top : .centeredVertically, animated: false)
+        let sectionIndex = eventIndex + 1 // index + 1 because section 0 is the header
+        collectionView.scrollToItem(at: IndexPath(item: 0, section: sectionIndex), at: sectionIndex < 1 ? .top : .centeredVertically, animated: false)
     }
     
     override func scrollViewInsetsDidChange() {
@@ -78,7 +79,7 @@ class OnThisDayViewController: ColumnarCollectionViewController, ReadingListHint
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        if isMovingFromParentViewController {
+        if isMovingFromParent {
             FeedFunnel.shared.logFeedCardClosed(for: feedFunnelContext, maxViewed: maxViewed)
         }
     }
@@ -102,7 +103,7 @@ class OnThisDayViewController: ColumnarCollectionViewController, ReadingListHint
         }
         placeholderCell.layoutMargins = layout.itemLayoutMargins
         placeholderCell.configure(with: event, dataStore: dataStore, theme: theme, layoutOnly: true, shouldAnimateDots: false)
-        estimate.height = placeholderCell.sizeThatFits(CGSize(width: columnWidth, height: UIViewNoIntrinsicMetric), apply: false).height
+        estimate.height = placeholderCell.sizeThatFits(CGSize(width: columnWidth, height: UIView.noIntrinsicMetric), apply: false).height
         estimate.precalculated = true
         return estimate
     }
@@ -193,12 +194,12 @@ extension OnThisDayViewController {
     }
     
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
-        guard indexPath.section > 0, kind == UICollectionElementKindSectionHeader else {
+        guard indexPath.section > 0, kind == UICollectionView.elementKindSectionHeader else {
             return super.collectionView(collectionView, viewForSupplementaryElementOfKind: kind, at: indexPath)
         }
         guard
             indexPath.section == 1,
-            kind == UICollectionElementKindSectionHeader,
+            kind == UICollectionView.elementKindSectionHeader,
             let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: OnThisDayViewController.headerReuseIdentifier, for: indexPath) as? OnThisDayViewControllerHeader
         else {
             return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: OnThisDayViewController.blankHeaderReuseIdentifier, for: indexPath)
@@ -227,14 +228,14 @@ extension OnThisDayViewController {
     }
     
     func collectionView(_ collectionView: UICollectionView, willDisplaySupplementaryView view: UICollectionReusableView, forElementKind elementKind: String, at indexPath: IndexPath) {
-        guard indexPath.section == 0, elementKind == UICollectionElementKindSectionHeader else {
+        guard indexPath.section == 0, elementKind == UICollectionView.elementKindSectionHeader else {
             return
         }
         isDateVisibleInTitle = false
     }
     
     func collectionView(_ collectionView: UICollectionView, didEndDisplayingSupplementaryView view: UICollectionReusableView, forElementOfKind elementKind: String, at indexPath: IndexPath) {
-        guard indexPath.section == 0, elementKind == UICollectionElementKindSectionHeader else {
+        guard indexPath.section == 0, elementKind == UICollectionView.elementKindSectionHeader else {
             return
         }
         isDateVisibleInTitle = true

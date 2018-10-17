@@ -43,6 +43,8 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
 
 @property (nonatomic, strong) WMFTheme *theme;
 
+@property (nonatomic, getter=isAfterFirstUserScrollInteraction) BOOL afterFirstUserScrollInteraction;
+
 @end
 
 @implementation WebViewController
@@ -95,6 +97,9 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
             break;
         case WMFWKScriptMessageReferenceClicked:
             [self handleReferenceClickedScriptMessage:safeMessageBody];
+            break;
+        case WMFWKScriptMessageAddTitleDescriptionClicked:
+            [self handleAddTitleDescriptionClickedScriptMessage:safeMessageBody];
             break;
         case WMFWKScriptMessageEditClicked:
             [self handleEditClickedScriptMessage:safeMessageBody];
@@ -203,7 +208,6 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     [self wmf_dismissReferencePopoverAnimated:NO
                                    completion:^{
                                        [self hideFindInPageWithCompletion:^{
-
                                            NSString *href = messageDict[@"href"];
 
                                            if (href.length == 0) {
@@ -288,6 +292,10 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
     [self showReferenceFromLastClickedReferencesGroupAtIndex:selectedIndex.integerValue];
 }
 
+- (void)handleAddTitleDescriptionClickedScriptMessage:(NSDictionary *)messageDict {
+    [self.delegate webViewController:self didTapAddTitleDescriptionForArticle:self.article];
+}
+
 - (void)handleEditClickedScriptMessage:(NSDictionary *)messageDict {
     [self wmf_dismissReferencePopoverAnimated:NO
                                    completion:^{
@@ -302,9 +310,10 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
 
 - (void)handleArticleStateScriptMessage:(NSString *)messageString {
     if ([messageString isEqualToString:@"indexHTMLDocumentLoaded"]) {
+        self.afterFirstUserScrollInteraction = NO;
 
         NSString *decodedFragment = [[self.articleURL fragment] stringByRemovingPercentEncoding];
-        BOOL collapseTables = ![[NSUserDefaults wmf_userDefaults] wmf_isAutomaticTableOpeningEnabled];
+        BOOL collapseTables = ![[NSUserDefaults wmf] wmf_isAutomaticTableOpeningEnabled];
         [self.webView wmf_fetchTransformAndAppendSectionsToDocument:self.article collapseTables:collapseTables scrolledTo:decodedFragment];
 
         [self updateWebContentMarginForSize:self.view.bounds.size force:YES];
@@ -314,7 +323,7 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
         if (!self.isHeaderFadingEnabled) {
             return;
         }
-        
+
         [UIView animateWithDuration:0.3
                               delay:0.0f
                             options:UIViewAnimationOptionBeginFromCurrentState
@@ -322,7 +331,7 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
                              self.headerView.alpha = 1;
                          }
                          completion:^(BOOL done){
-                             
+
                          }];
     }
 }
@@ -578,6 +587,7 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
         @"linkClicked",
         @"imageClicked",
         @"referenceClicked",
+        @"addTitleDescriptionClicked",
         @"editClicked",
         @"javascriptConsoleLog",
         @"articleState",
@@ -877,7 +887,6 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
 - (void)refererenceLinkTappedWithNotification:(NSNotification *)notification {
     [self wmf_dismissReferencePopoverAnimated:NO
                                    completion:^{
-
                                        NSAssert([notification.object isMemberOfClass:[NSURL class]], @"WMFReferenceLinkTappedNotification did not contain NSURL");
                                        NSURL *URL = notification.object;
                                        NSAssert(URL != nil, @"WMFReferenceLinkTappedNotification NSURL was unexpectedly nil");
@@ -1059,6 +1068,14 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
         [self.delegate webViewController:self scrollViewDidScroll:scrollView];
     }
     [self minimizeFindInPage];
+    if (@available(iOS 12.0, *)) {
+        // Somewhere along the line the webView.scrollView.contentOffset is set to 0,0 on iOS 12 and there's nothing useful in the stack trace
+        // Workaround this issue by correcting it to the top offset if it occurs before the first user scroll event
+        // 😂😭
+        if (!self.isAfterFirstUserScrollInteraction && CGPointEqualToPoint(scrollView.contentOffset, CGPointZero)) {
+            [scrollView wmf_scrollToTop:NO];
+        }
+    }
 }
 
 - (BOOL)scrollViewShouldScrollToTop:(UIScrollView *)scrollView {
@@ -1075,6 +1092,7 @@ typedef NS_ENUM(NSUInteger, WMFFindInPageScrollDirection) {
 }
 
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    self.afterFirstUserScrollInteraction = YES;
     if ([self.delegate respondsToSelector:@selector(webViewController:scrollViewWillBeginDragging:)]) {
         [self.delegate webViewController:self scrollViewWillBeginDragging:scrollView];
     }

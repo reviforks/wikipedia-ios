@@ -131,14 +131,34 @@ public class NavigationBar: SetupView, FakeProgressReceiving, FakeProgressDelega
         } else if let systemBarButton = item as? SystemBarButton, let systemItem = systemBarButton.systemItem {
             barButtonItem = SystemBarButton(with: systemItem, target: systemBarButton.target, action: systemBarButton.action)
         } else if let customView = item.customView {
-            barButtonItem = UIBarButtonItem(customView: customView)
+            let customViewData = NSKeyedArchiver.archivedData(withRootObject: customView)
+            if let copiedView = NSKeyedUnarchiver.unarchiveObject(with: customViewData) as? UIView {
+                if let button = customView as? UIButton, let copiedButton = copiedView as? UIButton {
+                    for target in button.allTargets {
+                        guard let actions = button.actions(forTarget: target, forControlEvent: .touchUpInside) else {
+                            continue
+                        }
+                        for action in actions {
+                            copiedButton.addTarget(target, action: Selector(action), for: .touchUpInside)
+                        }
+                    }
+                }
+                barButtonItem = UIBarButtonItem(customView: copiedView)
+            } else {
+                assert(false, "unable to copy custom view")
+                barButtonItem = item
+            }
+        } else if let image = item.image {
+            barButtonItem = UIBarButtonItem(image: image, landscapeImagePhone: item.landscapeImagePhone, style: item.style, target: item.target, action: item.action)
         } else {
-            assert(item.image != nil, "barButtonItem must have title OR be of type SystemBarButton OR have image OR have custom view")
+            assert(false, "barButtonItem must have title OR be of type SystemBarButton OR have image OR have custom view")
             barButtonItem = item
         }
         barButtonItem.isEnabled = item.isEnabled
         return barButtonItem
     }
+    
+    private var titleBarHeightConstraint: NSLayoutConstraint!
     
     private var underBarViewHeightConstraint: NSLayoutConstraint!
     
@@ -150,7 +170,7 @@ public class NavigationBar: SetupView, FakeProgressReceiving, FakeProgressDelega
     
     private var titleBarTopConstraint: NSLayoutConstraint!
     private var barTopConstraint: NSLayoutConstraint!
-    var barTopSpacing: CGFloat = 0 {
+    public var barTopSpacing: CGFloat = 0 {
         didSet {
             titleBarTopConstraint.constant = barTopSpacing
             barTopConstraint.constant = barTopSpacing
@@ -203,6 +223,10 @@ public class NavigationBar: SetupView, FakeProgressReceiving, FakeProgressDelega
         updatedConstraints.append(statusBarUnderlayLeadingConstraint)
         let statusBarUnderlayTrailingConstraint = trailingAnchor.constraint(equalTo: statusBarUnderlay.trailingAnchor)
         updatedConstraints.append(statusBarUnderlayTrailingConstraint)
+        
+        titleBarHeightConstraint = titleBar.heightAnchor.constraint(equalToConstant: 44)
+        titleBarHeightConstraint.priority = UILayoutPriority(rawValue: 999)
+        titleBar.addConstraint(titleBarHeightConstraint)
         
         titleBarTopConstraint = titleBar.topAnchor.constraint(equalTo: statusBarUnderlay.bottomAnchor, constant: barTopSpacing)
         let titleBarLeadingConstraint = leadingAnchor.constraint(equalTo: titleBar.leadingAnchor)
@@ -315,7 +339,9 @@ public class NavigationBar: SetupView, FakeProgressReceiving, FakeProgressDelega
     }
     
     @objc public func setNavigationBarPercentHidden(_ navigationBarPercentHidden: CGFloat, underBarViewPercentHidden: CGFloat, extendedViewPercentHidden: CGFloat, topSpacingPercentHidden: CGFloat, shadowAlpha: CGFloat = -1, animated: Bool, additionalAnimations: (() -> Void)? = nil) {
-        layoutIfNeeded()
+        if (animated) {
+            layoutIfNeeded()
+        }
 
         if isTopSpacingHidingEnabled {
             _topSpacingPercentHidden = topSpacingPercentHidden
@@ -340,7 +366,9 @@ public class NavigationBar: SetupView, FakeProgressReceiving, FakeProgressDelega
                 if shadowAlpha >= 0  {
                     self.shadowAlpha = shadowAlpha
                 }
-                self.layoutSubviews()
+                if (animated) {
+                    self.layoutSubviews()
+                }
                 additionalAnimations?()
             }
             if animated {
@@ -382,7 +410,9 @@ public class NavigationBar: SetupView, FakeProgressReceiving, FakeProgressDelega
             barTopSpacing = 0
             return
         }
-        barTopSpacing = safeAreaInsets.top > 0 ? 30 : 0
+        let isSafeAreaInsetsTopGreaterThanZero = safeAreaInsets.top > 0
+        barTopSpacing = isSafeAreaInsetsTopGreaterThanZero ? 30 : 0
+        titleBarHeightConstraint.constant = isSafeAreaInsetsTopGreaterThanZero ? 44 : 32 // it doesn't seem like there's a way to force update of bar metrics - as it stands the bar height gets stuck in whatever mode the app was launched in
     }
     
     private func updateShadowConstraints() {

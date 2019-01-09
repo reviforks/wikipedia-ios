@@ -654,10 +654,30 @@
         toggleMarkup('heading', equals, equals)
       },
       increaseIndentDepth: () => {
-        console.log('increaseIndentDepth')
+        const selection = editor.getSelection()
+        if (selection.length > 0) {
+            // text selected
+        } else {
+            // cursor
+            editor.replaceSelection(':', 'end')
+        }
       },
       decreaseIndentDepth: () => {
-        console.log('decreaseIndentDepth')
+        const selection = editor.getSelection()
+          if (selection.length > 0) {
+              // text selected
+          } else {
+              // cursor
+              const cursorPosition = editor.getCursor()
+              const tokenType = editor.getTokenTypeAt(cursorPosition)
+              if (tokenType === "mw-indenting") {
+                  // proceed
+                  editor.execCommand('delCharBefore')
+              } else {
+                  // nothing to do
+                  return
+              }
+          }
       },
       textSize: (newSize) => {
         if (newSize === 'small') {
